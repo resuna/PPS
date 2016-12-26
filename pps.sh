@@ -6,12 +6,13 @@ tabs=8
 title="Standard Input"
 titlefont="Times-Bold"
 numberfont="Times-Roman"
+slantfont="Times-Italic"
 textfont=Courier
+textslantfont=Courier-Oblique
+fixaspect=0.6
 faxfrom="$NAME"
 underline=false
-mail=false
 bold=-Bold
-slant=-Oblique
 titlesize=12
 date="`date`"
 number=false
@@ -51,8 +52,17 @@ while
     -lucida)
       shift
       textfont=LucidaSans-Typewriter
+      fixaspect=0.602
       underline=true
       bold=Bold
+      true;;
+    -tex)
+      shift
+      textfont=cmtex10
+      textslantfont=cmsltt10
+      fixaspect=0.524
+      pfa="/usr/local/lib/cmfonts/cmtex10.pfb /usr/local/lib/cmfonts/cmsltt10.pfb"
+      bold=
       true;;
     -underline)
       shift
@@ -76,6 +86,11 @@ while
     -F)
       shift
       numberfont=$1
+      shift
+      true;;
+    -i)
+      shift
+      slantfont=$1
       shift
       true;;
     -L)
@@ -110,10 +125,6 @@ while
       faxto="$1"
       shift
       true;;
-    -mail)
-      shift
-      mail=true
-      true;;
     -*)
       echo "Usage: pps [-t tabs] [-l lines] [-c cols] [-h title]" 1>&2
       echo "           [-[fF] font] [-d date] [-L[L]] [-N[period]]" 1>&2
@@ -126,6 +137,16 @@ while
 do :
 done
 
+if [ ".$pfa" != "." ]
+then
+  for i in $pfa
+  do
+    case $i in
+      *.pfa) cat $i;;
+      *.pfb) t1ascii $i 2> /dev/null;;
+    esac
+  done
+fi
 echo "%!"
 
 if [ "$iso" = "true" ]
@@ -206,20 +227,23 @@ cat << \!
 !
   if [ $underline = false ]
   then
-    echo "/$textfont$slant /ISO-$textfont$slant ISOVec ReEncodeSmall"
+    echo "/$textslantfont /ISO-$textslantfont ISOVec ReEncodeSmall"
   fi
   echo "/$textfont /ISO-$textfont ISOVec ReEncodeSmall"
   echo "/$textfont$bold /ISO-$textfont$bold ISOVec ReEncodeSmall"
   echo "/$titlefont /ISO-$titlefont ISOVec ReEncodeSmall"
-  echo "/${titlefont}Italic /ISO-${titlefont}Italic ISOVec ReEncodeSmall"
+  echo "/${slantfont} /ISO-${slantfont} ISOVec ReEncodeSmall"
   if [ "$number" = "true" ]
   then echo "/$numberfont /ISO-$numberfont ISOVec ReEncodeSmall"
   fi
   titlefont=ISO-$titlefont
+  slantfont=ISO-$slantfont
   numberfont=ISO-$numberfont
   courier=ISO-$textfont
+  courierslant=ISO-$textslantfont
 else
   courier=$textfont
+  courierslant=$textslantfont
 fi
 
 if [ "$faxto" ]
@@ -240,16 +264,17 @@ else
   echo "/SIMPLE false def"
 fi
 echo "/ROMANFONT /${titlefont} def"
-echo "/ITALICFONT /${titlefont}Italic def"
+echo "/ITALICFONT /${slantfont} def"
 echo "/FONTSIZE $titlesize def"
 if [ "$number" = "true" ]
 then echo "/NUMBERFONT /$numberfont def"
 fi
 echo "/NORMALFONT /$courier def"
 echo "/BOLDFONT /$courier$bold def"
+echo "/FIXASPECT $fixaspect def"
 if [ $underline = false ]
 then
-  echo "/SLANTFONT /$courier$slant def"
+  echo "/SLANTFONT /$courierslant def"
   echo "/has-slant true def"
 else
   echo "/has-slant false def"
@@ -297,7 +322,7 @@ cat << \!
 /ysize SIMPLE {10} {9.5} ifelse inch def
 
 % Fonts and line spacing...
-/xscale xsize 0.6 div COLS div def
+/xscale xsize FIXASPECT div COLS div def
 /yscale ysize LINES div def
 /fontscale [xscale 0 0 yscale 0 0] def
 /fixed-normal NORMALFONT findfont fontscale makefont def
@@ -489,44 +514,4 @@ has-slant {/fixed-slant SLANTFONT findfont fontscale makefont def} if
 	} forall col add /col exch def
 } def
 !
-if [ true = $mail ]
-then
-cat << \!
-
-/title {
-	newpath left bar moveto right bar lineto stroke
-	ROMAN setfont
-	right DATE stringwidth pop sub titleplace FONTSIZE add moveto
-	DATE show
-
-	ROMAN setfont
-	right SUBJECT stringwidth pop sub titleplace moveto
-	SUBJECT show
-
-	left titleplace FONTSIZE add moveto
-	ROMAN setfont (From: ) show
-	fixed-bold setfont FROM show
-
-	left
-	  titleplace (From: ) stringwidth pop (To: ) stringwidth pop sub add
-	  moveto
-	ROMAN setfont (To: ) show
-	fixed-bold setfont TO show
-
-	ROMAN setfont
-
-	pno 1 add dup /pno exch def (     ) cvs
-	dup stringwidth pop 2 div middle exch sub
-		titleplace FONTSIZE 2 div add moveto show
-	/line top def
-} def
-/BODY {
-	newpath left line moveto right line lineto stroke NL
-} def
-/HEADER {
-} def
-!
-  preps $magic -e -w$cols -t$tabs ${1+"$@"}
-else
-  preps $magic -w$cols -t$tabs ${1+"$@"}
-fi
+preps $magic -w$cols -t$tabs ${1+"$@"}
